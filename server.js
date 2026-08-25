@@ -5,9 +5,6 @@ var host = process.env.HOST || '0.0.0.0';
 var port = process.env.PORT || 8080;
 
 // Grab the blacklist from the command-line so that we can update the blacklist without deploying
-// again. CORS Anywhere is open by design, and this blacklist is not used, except for countering
-// immediate abuse (e.g. denial of service). If you want to block all origins except for some,
-// use originWhitelist instead.
 var originBlacklist = parseEnvList(process.env.CORSANYWHERE_BLACKLIST);
 var originWhitelist = parseEnvList(process.env.CORSANYWHERE_WHITELIST);
 
@@ -18,8 +15,10 @@ function parseEnvList(env) {
   return env.split(',');
 }
 
-// Set up rate-limiting to avoid abuse of the public CORS Anywhere server.
-var checkRateLimit = require('./lib/rate-limit')(process.env.CORSANYWHERE_RATELIMIT);
+// Set up rate-limiting to avoid abuse
+var checkRateLimit = require('./lib/rate-limit')(
+  process.env.CORSANYWHERE_RATELIMIT
+);
 
 var cors_proxy = require('./lib/cors-anywhere');
 
@@ -27,42 +26,44 @@ cors_proxy.createServer({
   originBlacklist: originBlacklist,
   originWhitelist: originWhitelist,
 
-  // Require Origin or X-Requested-With from the client
-  requireHeader: ['origin', 'x-requested-with'],
+  // Permitir peticiones directas sin exigir Origin/X-Requested-With
+  requireHeader: [],
 
   checkRateLimit: checkRateLimit,
 
-  // Headers removed from requests
+  // Headers que no se deben reenviar
   removeHeaders: [
     'cookie',
     'cookie2',
 
-    // Strip Heroku-specific headers
+    // Headers específicos de Heroku
     'x-request-start',
     'x-request-id',
     'via',
     'connect-time',
     'total-route-time',
 
-    // Other Heroku added debug headers
-    // 'x-forwarded-for',
-    // 'x-forwarded-proto',
-    // 'x-forwarded-port',
+    // No eliminar estos:
+    // origin
+    // referer
+    // user-agent
   ],
 
   redirectSameOrigin: true,
 
   httpProxyOptions: {
-    // Headers that will be sent to the destination server
+    // Headers enviados al servidor de destino
     headers: {
       Origin: 'https://www.izzigo.tv',
       Referer: 'https://www.izzigo.tv/',
     },
 
-    // Do not add X-Forwarded-For, etc.
+    // No agregar X-Forwarded-For
     xfwd: false,
   },
 
 }).listen(port, host, function() {
-  console.log('Running CORS Anywhere on ' + host + ':' + port);
+  console.log(
+    'Running CORS Anywhere on ' + host + ':' + port
+  );
 });
